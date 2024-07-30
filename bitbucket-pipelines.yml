@@ -1,0 +1,133 @@
+image: node:20.11.1-alpine
+definitions:
+  caches:
+    sonar: ~/.sonar  # Caching SonarCloud artifacts will speed up your build 
+  services:
+    docker:
+      memory: 3072
+pipelines:
+  branches:
+    release/develop:
+      - step:
+          name: Code Analysis
+          services:
+            - docker
+          size: 2x
+          image: node:20.11.1-alpine
+          clone:
+            depth: full    # SonarCloud scanner needs the full history to assign issues properly
+          caches: # Caching artifacts to speed up the build
+            - node
+            - sonar
+          script:
+            - npm ci
+            - echo "Listing TypeScript files:"
+            - pwd
+            - find . -name "*.ts" -o -name "*.tsx"
+            - pipe: sonarsource/sonarqube-scan:2.0.1
+              variables:
+                SONAR_HOST_URL: ${SONAR_HOST_URL}
+                SONAR_TOKEN: ${SONAR_TOKEN}
+                EXTRA_ARGS: -Dsonar.sourceEncoding=UTF-8 -Dsonar.javascript.node.maxspace=8192 -Dsonar.projectKey=comeonda-adminpanel-newdesign    
+      - step:
+          name: Install Deps and building
+          caches:
+            - node
+          script:
+            - npm install
+            - CI=false npm run build
+          artifacts:
+            - .next/**
+      - step:
+          name: Deploying to Dev server
+          script:
+            - pipe: atlassian/rsync-deploy:0.6.0
+              variables:
+                USER: "comeonda"
+                SERVER: "live.xminds.com"
+                SSH_PORT: "2221"
+                REMOTE_PATH: "/home/comeonda/comeonda-apnew"
+                LOCAL_PATH: "."
+                DEBUG: "true"
+                EXTRA_ARGS: "-azh --exclude bitbucket-pipelines.yml --exclude .git --exclude .gitignore --exclude .bitbucket --exclude .env.local --exclude Update.sh --exclude .htaccess"
+      - step:
+          name: Updating the dev Server
+          artifacts:
+            download: false
+          script:
+            - pipe: atlassian/ssh-run:0.4.1
+              variables:
+                SSH_USER: comeonda
+                SERVER: live.xminds.com
+                PORT: "2221"
+                MODE: "command"
+                COMMAND: "/home/comeonda/comeonda-apnew/Update.sh"
+    release/stag:
+      - step:
+          name: Install Deps and building
+          caches:
+            - node
+          script:
+            - npm install
+            - CI=false npm run build
+          artifacts:
+            - .next/**
+      - step:
+          name: Deploying to Stag server
+          script:
+            - pipe: atlassian/rsync-deploy:0.6.0
+              variables:
+                USER: "comeonda"
+                SERVER: "live.xminds.com"
+                SSH_PORT: "2221"
+                REMOTE_PATH: "${deploy}"
+                LOCAL_PATH: "."
+                DEBUG: "true"
+                EXTRA_ARGS: "-azh --exclude bitbucket-pipelines.yml --exclude .git --exclude .gitignore --exclude .bitbucket --exclude .env.local --exclude Update.sh --exclude .htaccess"
+      - step:
+          name: Updating the Stag Server
+          artifacts:
+            download: false
+          script:
+            - pipe: atlassian/ssh-run:0.4.1
+              variables:
+                SSH_USER: comeonda
+                SERVER: live.xminds.com
+                PORT: "2221"
+                MODE: "command"
+                COMMAND: "${deploy}/Update.sh"
+  custom:
+    release/prod:
+      - step:
+          name: Install Deps and building
+          caches:
+            - node
+          script:
+            - npm install
+            - CI=false npm run build
+          artifacts:
+            - .next/**
+      - step:
+          name: Deploying to Dev server
+          script:
+            - pipe: atlassian/rsync-deploy:0.6.0
+              variables:
+                USER: "comeonda"
+                SERVER: "44.210.200.10"
+                SSH_PORT: "22"
+                REMOTE_PATH: "/home/comeonda/comeonda-adminpanel-prod"
+                LOCAL_PATH: "."
+                DEBUG: "true"
+                EXTRA_ARGS: "-azh --exclude bitbucket-pipelines.yml --exclude .git --exclude .gitignore --exclude .bitbucket --exclude .env.local --exclude Update.sh --exclude .htaccess"
+      - step:
+          name: Updating the dev Server
+          artifacts:
+            download: false
+          script:
+            - pipe: atlassian/ssh-run:0.4.1
+              variables:
+                SSH_USER: comeonda
+                SERVER: 44.210.200.10
+                PORT: "22"
+                MODE: "command"
+                COMMAND: "/home/comeonda/comeonda-adminpanel-prod/Update.sh"

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app-service
+spec:
+  selector:
+    app: my-app
+  ports:
+    - protocol: TCP
+      port: 80          # Port that the Service exposes
+      targetPort: 3000  # Port on the container that the Service forwards to
+  type: LoadBalancer    # Type of service (LoadBalancer, ClusterIP, NodePort)
+

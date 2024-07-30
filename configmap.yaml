@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-app-config
+data:
+  NEXT_PUBLIC_API_URL: "https://betty-dev-api.xminds.in/"
+
