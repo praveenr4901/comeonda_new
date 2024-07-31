@@ -22,4 +22,4 @@ jobs:
           context: ./
           file: ./Dockerfile1
           push: true
-          tags: praveenr4901/comeonda:latest
+          tags: praveen4901/comeonda:v5
