@@ -16,10 +16,35 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Test Docker Login
+        run: docker info
+
+      - name: Get Current Docker Image Tags
+        id: docker_tags
+        run: |
+          echo "Fetching tags from Docker Hub"
+          tags=$(curl -s -H "Authorization: Bearer ${{ secrets.DOCKER_PASSWORD }}" "https://registry.hub.docker.com/v2/repositories/praveenr4901/comeonda/tags?page_size=100" | jq -r '."results"[]["name"]')
+          echo "Current tags: $tags"
+          echo "::set-output name=tags::$tags"
+
+      - name: Determine Next Version Tag
+        id: next_version
+        run: |
+          current_tags="${{ steps.docker_tags.outputs.tags }}"
+          echo "Current tags: $current_tags"
+          latest_version=$(echo "$current_tags" | grep -E '^v[0-9]+$' | sort -V | tail -n 1)
+          if [ -z "$latest_version" ]; then
+            next_version="v1"
+          else
+            next_version="v$(( ${latest_version:1} + 1 ))"
+          fi
+          echo "Next version: $next_version"
+          echo "::set-output name=next_version::$next_version"
+
       - name: Build and Push Docker Image to Docker Hub
         uses: docker/build-push-action@v5
         with:
           context: ./
           file: ./Dockerfile1
           push: true
-          tags: praveen4901/comeonda:v5
+          tags: praveenr4901/comeonda:latest,praveenr4901/comeonda:${{ steps.next_version.outputs.next_version }}
